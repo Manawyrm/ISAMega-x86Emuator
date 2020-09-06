@@ -1,0 +1,13 @@
+changelog
+VERSION
+*.out
+*.o
+*.elf
+*.so
+.gdb_history
+vncmux
+*.data
+*.s
+*.old
+*.fnt
+*.bak
