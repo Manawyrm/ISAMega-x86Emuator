@@ -15,7 +15,7 @@
 #include <arpa/inet.h>
 
 void init_serial();
-void ioWrite(uint16_t address, uint8_t data);
-uint8_t ioRead(uint16_t address);
+void ioWrite(uint32_t address, uint8_t data);
+uint8_t ioRead(uint32_t address);
 void memWrite(uint32_t address, uint8_t data);
 uint8_t memRead(uint32_t address);

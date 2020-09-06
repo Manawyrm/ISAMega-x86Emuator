@@ -98,7 +98,7 @@ unsigned emu_memio_handler(x86emu_t *emu, u32 addr, u32 *val, unsigned type)
 	{
 		printf("[memio] output! Addr: %08lx Val: %08lx\n", (unsigned long) addr, (unsigned long) *val);
 		ioWrite(addr, *val);
-		ioWrite(0x80, *val);
+		//ioWrite(0x80, *val);
 		return 0;
 	}
 

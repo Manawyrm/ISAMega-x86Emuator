@@ -39,8 +39,8 @@ void init_serial()
 	tty.c_cc[VTIME] = 0;  // Wait for up to 1s (10 deciseconds), returning as soon as any data is received.
 	tty.c_cc[VMIN] = 0;
 
-	cfsetispeed(&tty, B115200);
-	cfsetospeed(&tty, B115200);
+	cfsetispeed(&tty, B1000000);
+	cfsetospeed(&tty, B1000000);
 
 	if (tcsetattr(serial, TCSANOW, &tty) != 0)
 	{
@@ -48,7 +48,7 @@ void init_serial()
 	}
 
 	// wait for readyness
-	char read_buf[256];
+	/*char read_buf[256];
 	while (1)
 	{
 		int n = read(serial, &read_buf, sizeof(read_buf));
@@ -61,16 +61,20 @@ void init_serial()
 				return;
 			}
 		}
-	}
+	}*/
 }
 
-void ioWrite(uint16_t address, uint8_t data)
+void ioWrite(uint32_t address, uint8_t data)
 {
-	char buffer[100];
-	uint16_t length = snprintf(buffer, 100, "o%04X%02X\n", address, data);
-	write(serial, buffer, length);
+	uint8_t buffer[100];
 
-	//printf("%s\n", buffer);
+	buffer[0] = 'o';
+	buffer[1] = (address >> 8) & 0xFF;
+	buffer[2] = address & 0xFF;
+	buffer[3] = data;
+
+	write(serial, buffer, 4);
+
 	//printf("[outb] Addr: %04lx, Data: %02lx\n", address, data);
 
 	// wait for return 
@@ -88,42 +92,45 @@ void ioWrite(uint16_t address, uint8_t data)
 	}
 }
 
-uint8_t ioRead(uint16_t address)
+uint8_t ioRead(uint32_t address)
 {
-	char buffer[100];
-	uint16_t length = snprintf(buffer, 100, "i%04X\n", address);
-	write(serial, buffer, length);
+	uint8_t buffer[100];
+	buffer[0] = 'i';
+	buffer[1] = (address >> 8) & 0xFF;
+	buffer[2] = address & 0xFF;
+
+	write(serial, buffer, 3);
 
 	//printf("%s\n", buffer);
 	//printf("[inb] Addr: %04lx, Data: %02lx\n", address);
 
 	// wait for return 
 	char read_buf[256];
+	uint8_t data = 0x00;
 	uint16_t offset = 0;
 	while (1)
 	{
 		int n = read(serial, read_buf + offset, (sizeof(read_buf) - offset));
 		for (int i = 0; i < (offset + n); ++i)
 		{
-			if (read_buf[i] == '\n')
-			{
-				read_buf[i + 1] = 0x00;
-				//printf("%s\n", read_buf);
-				return strtol(read_buf + 1, NULL, 16);
-			}
+			data = read_buf[offset + i];
+			printf("[inb] Addr: %04lx, Data: %02lx\n", address, data);
+			return data;
 		}
 		offset += n;
 	}
 }
 
-
 void memWrite(uint32_t address, uint8_t data)
 {
-	char buffer[100];
-	uint16_t length = snprintf(buffer, 100, "w%06X%02X\n", address, data);
-	write(serial, buffer, length);
+	uint8_t buffer[100];
+	buffer[0] = 'w';
+	buffer[1] = (address >> 16) & 0xFF;
+	buffer[2] = (address >> 8) & 0xFF;
+	buffer[3] = address & 0xFF;
+	buffer[4] = data;
 
-	//printf("%s\n", buffer);
+	write(serial, buffer, 5);
 
 	// wait for return 
 	char read_buf[256];
@@ -142,9 +149,13 @@ void memWrite(uint32_t address, uint8_t data)
 
 uint8_t memRead(uint32_t address)
 {
-	char buffer[100];
-	uint16_t length = snprintf(buffer, 100, "r%06X\n", address);
-	write(serial, buffer, length);
+	uint8_t buffer[100];
+	buffer[0] = 'r';
+	buffer[1] = (address >> 16) & 0xFF;
+	buffer[2] = (address >> 8) & 0xFF;
+	buffer[3] = address & 0xFF;
+
+	write(serial, buffer, 4);
 
 	//printf("%s\n", buffer);
 
@@ -156,13 +167,18 @@ uint8_t memRead(uint32_t address)
 		int n = read(serial, read_buf + offset, (sizeof(read_buf) - offset));
 		for (int i = 0; i < (offset + n); ++i)
 		{
-			if (read_buf[i] == '\n')
-			{
-				read_buf[i + 1] = 0x00;
-				//printf("%s\n", read_buf);
-				return strtol(read_buf + 1, NULL, 16);
-			}
+			return read_buf[offset + i];
 		}
 		offset += n;
 	}
 }
+
+/*
+
+buffer[0] = 'o';
+buffer[1] = (address >> 16) & 0xFF;
+buffer[2] = (address >> 8) & 0xFF;
+buffer[3] = address & 0xFF;
+
+write(serial, buffer, 4);
+	 */ 
