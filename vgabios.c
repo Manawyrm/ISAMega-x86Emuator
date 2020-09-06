@@ -1,21 +1,4 @@
-#include <stdio.h>
-#include <stdlib.h>
-#include <getopt.h>
-#include <x86emu.h>
-#include <string.h>
-#include <stdint.h>
-#include <fcntl.h> // Contains file controls like O_RDWR
-#include <errno.h> // Error integer and strerror() function
-#include <termios.h> // Contains POSIX terminal control definitions
-#include <unistd.h>  // write(), read(), close()
-#include <assert.h>
-#include <signal.h>
-#include "serialisa.h"
-
-void flush_log(x86emu_t *emu, char *buf, unsigned size);
-x86emu_t* emu_new(void);
-int emu_init(x86emu_t *emu, char *file);
-void emu_run(char *file);
+#include "vgabios.h"
 
 #define VBIOS_ROM 0xc0000
 #define VBIOS_ROM_SIZE 0x10000
@@ -24,20 +7,10 @@ void emu_run(char *file);
 #define VBE_BUF 0x8000
 uint8_t loaded_rom = 0;
 
-static void vm_write_byte(x86emu_t *emu, unsigned addr, unsigned val, unsigned perm);
-static void vm_write_word(x86emu_t *emu, unsigned addr, unsigned val, unsigned perm);
-
 void vm_write_byte(x86emu_t *emu, unsigned addr, unsigned val, unsigned perm)
 {
 	x86emu_write_byte_noperm(emu, addr, val);
 	x86emu_set_perm(emu, addr, addr, perm | X86EMU_PERM_VALID);
-}
-
-void vm_write_word(x86emu_t *emu, unsigned addr, unsigned val, unsigned perm)
-{
-	x86emu_write_byte_noperm(emu, addr, val);
-	x86emu_write_byte_noperm(emu, addr + 1, val>> 8);
-	x86emu_set_perm(emu, addr, addr + 1, perm | X86EMU_PERM_VALID);
 }
 
 struct
@@ -60,9 +33,6 @@ opt;
  */
 int main(int argc, char **argv)
 {
-	int i;
-	char *str;
-
 	opt.start.segment = 0;
 	opt.start.offset = opt.load = 0x7c00;
 	opt.max_instructions = 0;
@@ -85,8 +55,6 @@ void flush_log(x86emu_t *emu, char *buf, unsigned size)
 x86emu_t * globalemu;
 void sigfunc(int sig)
 {
-	int c;
-
 	if (sig != SIGINT)
 		return;
 	else
@@ -128,7 +96,7 @@ unsigned emu_memio_handler(x86emu_t *emu, u32 addr, u32 *val, unsigned type)
 
 	if (mytype == X86EMU_MEMIO_O)
 	{
-		printf("[memio] output! Addr: %08lx Val: %08lx\n", addr, *val);
+		printf("[memio] output! Addr: %08lx Val: %08lx\n", (unsigned long) addr, (unsigned long) *val);
 		ioWrite(addr, *val);
 		ioWrite(0x80, *val);
 		return 0;
@@ -137,7 +105,7 @@ unsigned emu_memio_handler(x86emu_t *emu, u32 addr, u32 *val, unsigned type)
 	if (mytype == X86EMU_MEMIO_I)
 	{
 		uint8_t data = ioRead(addr);
-		printf("[memio] input! Addr: %08lx Read value: %02x\n", addr, data);
+		printf("[memio] input! Addr: %08lx Read value: %02x\n", (unsigned long) addr, data);
 
 		*val = data;
 
@@ -160,12 +128,12 @@ unsigned emu_memio_handler(x86emu_t *emu, u32 addr, u32 *val, unsigned type)
 						uint8_t data = memRead(addr);
 						*val = data;
 
-						printf("[memiorw] 8 RX addr: %08lx Data:%02x\n", addr, data);
+						printf("[memiorw] 8 RX addr: %08lx Data:%02x\n", (unsigned long) addr, data);
 					}
 					if (mytype == X86EMU_MEMIO_W)
 					{
 						memWrite(addr, *val);
-						printf("[memiorw] 8 W addr: %08lx Data:%02x\n", addr, *val);
+						printf("[memiorw] 8 W addr: %08lx Data:%02x\n", (unsigned long) addr, *val);
 					}
 					return 0;
 					break;
@@ -176,18 +144,18 @@ unsigned emu_memio_handler(x86emu_t *emu, u32 addr, u32 *val, unsigned type)
 						data |= memRead(addr + 1) << 8;
 						*val = data;
 
-						printf("[memiorw] 16 RX addr: %08lx Data:%04x\n", addr, data);
+						printf("[memiorw] 16 RX addr: %08lx Data:%04x\n", (unsigned long) addr, data);
 					}
 					if (mytype == X86EMU_MEMIO_W)
 					{
 						memWrite(addr, *val & 0xFF);
 						memWrite(addr + 1, (*val >> 8) & 0xFF);
-						printf("[memiorw] 16 W addr: %08lx Data:%04x\n", addr, *val);
+						printf("[memiorw] 16 W addr: %08lx Data:%04x\n", (unsigned long) addr, *val);
 					}
 					return 0;
 					break;
 				case X86EMU_MEMIO_32:
-					printf("[memiorw] 32 addr: %08lx\n", addr);
+					printf("[memiorw] 32 addr: %08lx\n", (unsigned long) addr);
 					assert(0);
 					break;
 			}
@@ -208,7 +176,7 @@ int emu_int_handler(x86emu_t *emu, u8 num, unsigned type)
 			// we'll just set AL to 12 as a "valid" return for each function.
 			// this is expected by Trident video ROMs. 
 
-			printf("[int] a: %08lx b: %08lx\n", emu->x86.gen.A.I32_reg.e_reg, emu->x86.gen.B.I32_reg.e_reg);
+			printf("[int] a: %08x b: %08x\n", emu->x86.gen.A.I32_reg.e_reg, emu->x86.gen.B.I32_reg.e_reg);
 			//[int] a: 00001201 b: 00000032
 
 			// AL=12 Function supported
@@ -227,14 +195,8 @@ int emu_int_handler(x86emu_t *emu, u8 num, unsigned type)
  */
 int emu_init(x86emu_t *emu, char *file)
 {
-	FILE * f;
-	unsigned addr;
-	int i;
-
 	//signal(SIGINT, sigfunc);
 	globalemu = emu;
-
-	addr = opt.load;
 
 	init_serial();
 
@@ -245,15 +207,19 @@ int emu_init(x86emu_t *emu, char *file)
 	x86emu_set_intr_handler(emu, emu_int_handler);
 
 	// Optional: Load a VGA BIOS from a file and write it to 0xC0000
-	/*if(!(f = fopen(file, "r"))) return 0;
-	 loaded_rom = 1; 
+	/*
+	{
+		FILE * f;
+		if(!(f = fopen(file, "r"))) return 0;
+		 loaded_rom = 1; 
 
-	 addr = VBIOS_ROM;
-	 while((i = fgetc(f)) != EOF) {
-		 x86emu_write_byte(emu, addr, i);
-		 x86emu_set_perm(emu, addr, addr++, X86EMU_PERM_RWX | X86EMU_PERM_VALID);
+		 addr = VBIOS_ROM;
+		 while((i = fgetc(f)) != EOF) {
+			 x86emu_write_byte(emu, addr, i);
+			 x86emu_set_perm(emu, addr, addr++, X86EMU_PERM_RWX | X86EMU_PERM_VALID);
+		 }
+		 fclose(f);
 	 }
-	 fclose(f);
 	 */
 
 	printf("video bios: size 0x%04x\n", x86emu_read_byte(emu, VBIOS_ROM + 2) * 0x200);

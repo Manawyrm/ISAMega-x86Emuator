@@ -64,9 +64,9 @@ void init_serial()
 	}
 }
 
-void ioWrite(uint32_t address, uint8_t data)
+void ioWrite(uint16_t address, uint8_t data)
 {
-	uint8_t buffer[100];
+	char buffer[100];
 	uint16_t length = snprintf(buffer, 100, "o%04X%02X\n", address, data);
 	write(serial, buffer, length);
 
@@ -88,9 +88,9 @@ void ioWrite(uint32_t address, uint8_t data)
 	}
 }
 
-uint8_t ioRead(uint32_t address)
+uint8_t ioRead(uint16_t address)
 {
-	uint8_t buffer[100];
+	char buffer[100];
 	uint16_t length = snprintf(buffer, 100, "i%04X\n", address);
 	write(serial, buffer, length);
 
@@ -119,7 +119,7 @@ uint8_t ioRead(uint32_t address)
 
 void memWrite(uint32_t address, uint8_t data)
 {
-	uint8_t buffer[100];
+	char buffer[100];
 	uint16_t length = snprintf(buffer, 100, "w%06X%02X\n", address, data);
 	write(serial, buffer, length);
 
@@ -142,7 +142,7 @@ void memWrite(uint32_t address, uint8_t data)
 
 uint8_t memRead(uint32_t address)
 {
-	uint8_t buffer[100];
+	char buffer[100];
 	uint16_t length = snprintf(buffer, 100, "r%06X\n", address);
 	write(serial, buffer, length);
 

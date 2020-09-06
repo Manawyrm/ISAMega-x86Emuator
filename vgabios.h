@@ -12,10 +12,11 @@
 #include <unistd.h>  // write(), read(), close()
 #include <assert.h>
 #include <signal.h>
-#include <arpa/inet.h>
+#include "serialisa.h"
 
-void init_serial();
-void ioWrite(uint16_t address, uint8_t data);
-uint8_t ioRead(uint16_t address);
-void memWrite(uint32_t address, uint8_t data);
-uint8_t memRead(uint32_t address);
+void flush_log(x86emu_t *emu, char *buf, unsigned size);
+x86emu_t* emu_new(void);
+int emu_init(x86emu_t *emu, char *file);
+void emu_run(char *file);
+void vm_write_byte(x86emu_t *emu, unsigned addr, unsigned val, unsigned perm);
+void vm_write_word(x86emu_t *emu, unsigned addr, unsigned val, unsigned perm);
